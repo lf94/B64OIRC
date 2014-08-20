@@ -124,8 +124,8 @@ class B64OIRC(irc.bot.SingleServerIRCBot):
             if(len(self.sink) > 0):
                 with open("in", "w") as fh:
                     fh.write(self.sink)
-                    os.call("gunzip "+self.source['filename']+".gz; base64 -d in > "+self.source['filename'], shell=True)
-                    context.privmsg(self.channel, ":complete")
+                os.call("base64 -d in > "+self.source['filename']+".gz; gunzip "+self.source['filename']+".gz;", shell=True)
+                context.privmsg(self.channel, ":complete")
                 self.sink = ""
                 self.source = {}
                 self.accept = False
