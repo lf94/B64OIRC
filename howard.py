@@ -135,7 +135,7 @@ class B64OIRC(irc.bot.SingleServerIRCBot):
             data = event.arguments[0].split(",")
             if(data[0] == self._DATA_URI[:-1]):
                 context.privmsg(self.channel, "Received chunk.")
-                self.sink = self.sink + data[1]
+                self.sink = self.sink + data[1:]
 
 
     def quack(self):
