@@ -98,10 +98,18 @@ class B64OIRC(irc.bot.SingleServerIRCBot):
             return
         
         if user+"_mailman" == self.target['user']:
+            fileinput = ""
             os.call("gzip "+self.target['filename']+"; base64 "+self.target['filename']+".gz | tr -d '\n' > out", shell=True)
             with open("out","r") as fh:
-                line = fh.read(510-len(self._DATA_URI))
-                context.privmsg(self.channel, self._DATA_URI+line)
+                fileinput = fh.read()
+            
+            pos = 0
+            msglen = 510-len(self._DATA_URI)-len(event.source)-len(event.target)
+            while pos < len(fileinput):
+                context.privmsg(self.channel, self._DATA_URI+fileinput[pos:pos+msglen])
+                pos += msglen
+                time.sleep(1)
+
             context.privmsg(self.channel, ":eof")
             self.target = {}
  
