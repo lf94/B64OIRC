@@ -104,7 +104,8 @@ class B64OIRC(irc.bot.SingleServerIRCBot):
                 fileinput = fh.read()
             
             pos = 0
-            msglen = 510-len(self._DATA_URI)-len(event.source)-len(event.target)
+            print(len(fileinput))
+            msglen = 510-len(self._DATA_URI)-75
             while pos < len(fileinput):
                 context.privmsg(self.channel, self._DATA_URI+fileinput[pos:pos+msglen])
                 pos += msglen
@@ -135,7 +136,7 @@ class B64OIRC(irc.bot.SingleServerIRCBot):
             data = event.arguments[0].split(",")
             if(data[0] == self._DATA_URI[:-1]):
                 context.privmsg(self.channel, "Received chunk.")
-                self.sink = self.sink + data[1:]
+                self.sink += data[1]
 
 
     def quack(self):
