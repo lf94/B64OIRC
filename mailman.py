@@ -9,7 +9,7 @@ _BOT_SUFFIX = "_mailman"
 
 class B64OIRC(irc.bot.SingleServerIRCBot):
     def __init__(self, owner, server, channel, port):
-        global _BOX_SUFFIX
+        global _BOT_SUFFIX
         self.owner = owner
         self.channel = channel
         self.nickname = owner+_BOT_SUFFIX
@@ -80,7 +80,7 @@ class B64OIRC(irc.bot.SingleServerIRCBot):
             context.privmsg(self.channel, "Target acquired.")
 
         if parameters['user'] == self.owner:
-            self.source['user'] = transmitter+_BOX_SUFFIX
+            self.source['user'] = transmitter+_BOT_SUFFIX
             self.source['filename'] = parameters['filename']
             context.privmsg(self.channel, "Awaiting receive.")
         
@@ -88,6 +88,7 @@ class B64OIRC(irc.bot.SingleServerIRCBot):
         self.locked = True
 
     def cancel(self, context, event):
+        context.privmsg(self.channel, "Cancelled transaction.")
         self.locked = False
         self.target = {}
         self.source = {}
