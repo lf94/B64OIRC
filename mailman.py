@@ -56,10 +56,10 @@ class B64OIRC(irc.bot.SingleServerIRCBot):
                 print(command)
                 getattr(self, command)(context,event)
 
-    def get_args(event):
+    def get_args(self, event):
         return event.arguments[0].split(" ")
 
-    def get_transmitter(event):
+    def get_transmitter(self, event):
         return event.source.split("!")[0]
 
     def send(self, context, event):
