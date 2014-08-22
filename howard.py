@@ -3,23 +3,22 @@ import irc.strings
 import subprocess as os
 import threading
 import time
+import sys
+
+_BOT_SUFFIX = "_mailman"
 
 class B64OIRC(irc.bot.SingleServerIRCBot):
-    def __init__(self, channel, owner, server, port):
+    def __init__(self, channel, server, owner, port):
         self.owner = owner
         self.channel = channel
-        self.nickname = owner+"_mailman"
+        self.nickname = owner+_BOT_SUFFIX
         self.target = {}
         self.source = {}
-        self.sending = False
         self.accept = False
         self.locked = False
         self.sink = ""
-        self.awaiting_confirmation = False
         self.interpret = True
         self._COMMANDS = ["send", "receive", "cancel"]
-        self._DATA_URI = "data:application/x-gzip;base64,"
-        self._TRUSTED = ["jimmt", "jimmt_mailman", "leeee", "leeee_mailman"]
         irc.bot.SingleServerIRCBot.__init__(self, [(server,port)], self.nickname, self.nickname)
 
     def on_welcome(self, context, event):
@@ -43,12 +42,8 @@ class B64OIRC(irc.bot.SingleServerIRCBot):
     def is_owner(self, context, event):
         user = event.source.split("!")[0]
         if(user != self.owner):
-            #context.privmsg(user, self.owner+" is my owner, asswipe; fuck off!")
             return False
         return True
-
-    def get_user(self, event):
-        return event.source.split("!")[0]
 
     def understand(self, context, event):
         if not self.interpret:
@@ -60,95 +55,101 @@ class B64OIRC(irc.bot.SingleServerIRCBot):
                 print(command)
                 getattr(self, command)(context,event)
 
+    def get_args(event):
+        return event.arguments[0].split(" ")
+
+    def get_transmitter(event):
+        return event.source.split("!")[0]
+
     def send(self, context, event):
-        chunks = event.arguments[0].split(" ")
+        chunks = self.get_args(event)
+        transmitter = self.get_transmitter(event)
+
         if len(chunks) != 3:
-            context.privmsg(self.channel, "Not enough arguments. Arguments: "+str(chunks))
+            context.privmsg(self.channel, "Format: :send <user> <filename>")
             return
-        user = chunks[1]
-        filename = chunks[2]
+
+        parameters = {'user': chunks[1], 'filename': chunks[2]}
         
-        if self.is_owner(context, event):
-            self.target['filename'] = filename
-            self.target['user'] = user+"_mailman"
+        if transmitter == self.owner:
+            self.target['user'] = parameters['user']
+            self.target['filename'] = parameters['filename']
             context.privmsg(self.channel, "Target acquired.")
 
-        if not self.awaiting_confirmation and user == self.owner:
-            self.source['user'] = event.source.split("!")[0]+"_mailman"
-            self.source['filename'] = filename
-            self.awaiting_confirmation = True
+        if parameters['user'] == self.owner:
+            self.source['user'] = transmitter+"_mailman"
+            self.source['filename'] = parameters['filename']
             context.privmsg(self.channel, "Awaiting receive.")
-            
+        
         context.privmsg(self.channel, "Locked.")
         self.locked = True
 
     def cancel(self, context, event):
         self.locked = False
-        self.awaiting_confirmation = False
+        self.target = {}
+        self.source = {}
         
     def receive(self, context, event):
         if not self.locked:
-            context.privmsg(self.channel, "Not locked.")
+            context.privmsg(self.channel, "Not locked in.")
             return
-        user = self.get_user(event)
-        context.privmsg(self.channel, user)
-        if self.is_owner(context, event):
-            context.privmsg(self.channel, "is owner and accepted")
+
+        transmitter = self.get_transmitter(event)
+
+        if transmitter == self.owner and len(self.target) == 0:
+            context.privmsg(self.channel, "Owner has accepted.")
             self.accept = True
             return
         
-        if user+"_mailman" == self.target['user']:
+        if transmitter == self.target['user']:
             fileinput = ""
             os.call("gzip "+self.target['filename']+"; base64 "+self.target['filename']+".gz | tr -d '\n' > out", shell=True)
             with open("out","r") as fh:
-                fileinput = fh.read()
+                data = fh.read()
             
-            pos = 0
-            print(len(fileinput))
-            msglen = 510-len(self._DATA_URI)-75
+            index = 0
+            target = self.channel
+            msg_length = 510-len(target)-50
+            context.privmsg(target, "File is {0} bytes.".format(len(fileinput)))
             while pos < len(fileinput):
-                context.privmsg(self.channel, self._DATA_URI+fileinput[pos:pos+msglen])
+                context.privmsg(target, data[index:index+msg_length])
                 pos += msglen
                 time.sleep(1)
 
             context.privmsg(self.channel, ":eof")
             self.target = {}
+            self.locked = False
  
     def eat(self, context, event):
-        user = self.get_user(event)
-        if user != self.source['user']:
-            context.privmsg(self.channel, "No interfering.")
+        transmitter = self.get_transmitter(event)
+
+        if transmitter != self.source['user']:
             return
-        chunks = event.arguments[0].split(" ")
-        if(chunks[0] == ":eof"):
+
+        chunks = get_args(event)
+        parameters = {'command': chunks[0]}
+
+        if(parameters['command'] == ":eof"):
             context.privmsg(self.channel, "EOF encountered. Writing file.")
             if(len(self.sink) > 0):
                 with open("in", "w") as fh:
                     fh.write(self.sink)
                 os.call("base64 -d in > "+self.source['filename']+".gz; gunzip "+self.source['filename']+".gz;", shell=True)
                 context.privmsg(self.channel, ":complete")
-                self.sink = ""
-                self.source = {}
-                self.accept = False
-                self.locked = False
-                self.awaiting_confirmation = True
+            self.sink = ""
+            self.source = {}
+            self.accept = False
+            self.locked = False
         else:
-            data = event.arguments[0].split(",")
-            if(data[0] == self._DATA_URI[:-1]):
-                context.privmsg(self.channel, "Received chunk.")
-                self.sink += data[1]
-
-
-    def quack(self):
-        self.start()
-
-def bot_instance(bot):
-    threading.Thread(target=bot.start).start()
+            data = event.arguments[0]
+            self.sink += data
 
 def main():
-    bot_instance(B64OIRC("#b64oirc", "leeee","irc.rizon.net", 6667))
-    #time.sleep(5)
-    #bot_instance(B64OIRC("#b64oirc", "hrffr", "irc.rizon.net", 6667))
-    
+    if(len(sys.args) != 4):
+        print("Usage: python howard.py username server channel")
+    your_irc_username = sys.args[1]
+    server = sys.args[2]
+    channel = sys.args[3]
+    B64OIRC(your_irc_username, server, channel, 6667).start()
 
 main()
