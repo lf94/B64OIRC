@@ -106,18 +106,16 @@ class B64OIRC(irc.bot.SingleServerIRCBot):
             return
         
         if transmitter == self.target['user']:
-            fileinput = ""
             os.call("gzip "+self.target['filename']+"; base64 "+self.target['filename']+".gz | tr -d '\n' > out", shell=True)
             with open("out","r") as fh:
                 data = fh.read()
             
             index = 0
             target = self.channel
-            msg_length = 510-len(target)-50
-            context.privmsg(target, "File is {0} bytes.".format(len(fileinput)))
-            while pos < len(fileinput):
+            msg_length = 510-(len(target)+50)
+            while index < len(data):
                 context.privmsg(target, data[index:index+msg_length])
-                pos += msglen
+                index += msg_length
                 time.sleep(1)
 
             context.privmsg(self.channel, ":eof")
@@ -130,7 +128,7 @@ class B64OIRC(irc.bot.SingleServerIRCBot):
         if transmitter != self.source['user']:
             return
 
-        chunks = get_args(event)
+        chunks = self.get_args(event)
         parameters = {'command': chunks[0]}
 
         if(parameters['command'] == ":eof"):
